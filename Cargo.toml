@@ -1,0 +1,14 @@
+[package]
+name = "forwarding-bot"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[dependencies.serenity]
+version = "0.10"
+default-features = false
+features = ["client", "builder", "cache", "utils", "gateway", "rustls_backend", "model"]
