@@ -3,7 +3,7 @@ use serenity::{
     client::{ Context },
     cache::Cache,
     http::client::Http,
-    model::{ channel::Message, gateway::Ready, id::ChannelId },
+    model::{ channel::Message, gateway::Ready, id::ChannelId, channel::ReactionType },
     prelude::*
 };
 
@@ -94,20 +94,9 @@ impl EventHandler for Handler {
     async fn message(&self, context: Context, msg: Message) {
         let cache = &context.cache;
         let name = msg.channel_id.name(cache).await;
-        let my_id;
-
-        match context.http.get_current_user().await {
-            Err(why) => {
-                println!("Error getting current user ID! {:?}", why);
-                return;
-            },
-            Ok(user) => {
-                my_id = user.id;
-            },
-        };
 
         // Make sure we're not the one who posted the message.
-        if msg.author.id == my_id {
+        if msg.is_own(cache).await {
             // We can post messages in the opportunities channel.
             return;
         }
@@ -120,6 +109,14 @@ impl EventHandler for Handler {
 
             if let Err(why) = self.block_illegal_post(reply_text, context, msg).await {
                 println!("Error blocking post! {:?}", why);
+            }
+        }
+        else if msg.is_private() {
+            // For fun :)
+            let reaction = ReactionType::Unicode("❓".to_string());
+            let reaction = msg.react(context.http.clone(), reaction).await;
+            if let Err(why) = reaction {
+                println!("Error reacting to direct message: {:?}", why);
             }
         }
     }
