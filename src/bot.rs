@@ -6,6 +6,7 @@ use serenity::{
     model::{ channel::Message, gateway::Ready, id::ChannelId, channel::ReactionType },
     prelude::*
 };
+use serenity::futures::StreamExt;
 
 use crate::github_scraper;
 use std::sync::Arc;
@@ -15,9 +16,12 @@ macro_rules! DELETED_MESSAGE_WARNING { () => { "I've deleted your message from t
 struct Handler;
 
 impl Handler {
-    /// Delete an illegal message, [msg] and direct message the author with [reply_text].
+    /// Delete an illegal message, [msg] and direct messages the author an appropriate
+    /// explanation.
     /// If unable to delete the message (an error!) no direct message is sent to the author.
-    async fn block_illegal_post(&self, reply_text: String, context: Context, msg: Message) -> Result<(), SerenityError> {
+    async fn block_illegal_post(&self, context: Context, msg: &Message) -> Result<(), SerenityError> {
+        let reply_text = format!(DELETED_MESSAGE_WARNING!(), msg.content, github_scraper::SOURCE_URL);
+
         let deletion = msg.delete(context.http.clone()).await;
         if let Err(why) = deletion {
             return Err(why);
@@ -69,6 +73,24 @@ impl Handler {
         Ok(result)
     }
 
+    /// Delete all illegal posts from [channel]. A message is considered illegal if
+    /// it was posted after the bot's last post in [channel].
+    async fn delete_illegal_posts(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
+        // See documentation for ChannelId::messages_iter.
+        let mut messages_stream = channel.messages_iter(&context).boxed();
+        while let Some(message) = messages_stream.next().await {
+            let message = message?;
+
+            // Stop when we encounter something we've posted.
+            // We only want to delete posts made while we've been away.
+            if message.is_own(&context).await {
+                break;
+            }
+
+            self.block_illegal_post(context.clone(), &message).await?;
+        }
+        Ok(())
+    }
 
     /// Forward new opportunities posted to GitHub to [channel].
     /// Returns errors generated in creating the message.
@@ -82,6 +104,13 @@ impl Handler {
         if let Err(why) = msg {
             return Err(why);
         }
+
+        Ok(())
+    }
+
+    async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), SerenityError> {
+        self.delete_illegal_posts(context.clone(), &channel_id).await?;
+        self.forward_opportunities(context.http.clone(), &channel_id).await?;
 
         Ok(())
     }
@@ -105,9 +134,7 @@ impl EventHandler for Handler {
             // Delete the message & dm the author.
             println!("Message posted in the opportunities channel! Deleting and replying.");
 
-            let reply_text = format!(DELETED_MESSAGE_WARNING!(), msg.content, github_scraper::SOURCE_URL);
-
-            if let Err(why) = self.block_illegal_post(reply_text, context, msg).await {
+            if let Err(why) = self.block_illegal_post(context, &msg).await {
                 println!("Error blocking post! {:?}", why);
             }
         }
@@ -136,7 +163,7 @@ impl EventHandler for Handler {
         };
 
         for channel_id in channels.iter() {
-            let res = self.forward_opportunities(context.http.clone(), &channel_id).await;
+            let res = self.handle_channel(context.clone(), &channel_id).await;
 
             if let Err(why) = res {
                 println!("Error forwarding opportunities to a channel: {:?}", why);
