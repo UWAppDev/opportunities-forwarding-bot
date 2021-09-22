@@ -6,9 +6,19 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+regex = "1"
+lazy_static = "^1.4"
+
+# Async
 tokio = { version = "1", features = ["full"] }
 
+# HTML fetching and scraping
+reqwest = "^0.11"
+select = "^0.5"
+
+# Discord API
 [dependencies.serenity]
 version = "0.10"
 default-features = false
 features = ["client", "builder", "cache", "utils", "collector", "gateway", "rustls_backend", "model"]
+

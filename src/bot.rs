@@ -10,6 +10,7 @@ use serenity::futures::StreamExt;
 
 use crate::github_scraper;
 use std::sync::Arc;
+use std::cmp::max;
 
 macro_rules! DELETED_MESSAGE_WARNING { () => { "I've deleted your message from the opportunities channel. It said: \n\n{}\n\nPlease post opportunities here: {}" }; }
 
@@ -20,7 +21,7 @@ impl Handler {
     /// explanation.
     /// If unable to delete the message (an error!) no direct message is sent to the author.
     async fn block_illegal_post(&self, context: Context, msg: &Message) -> Result<(), SerenityError> {
-        let reply_text = format!(DELETED_MESSAGE_WARNING!(), msg.content, github_scraper::SOURCE_URL);
+        let reply_text = format!(DELETED_MESSAGE_WARNING!(), msg.content, github_scraper::OPPORTUNITIES_POST_TO_URL);
 
         let deletion = msg.delete(context.http.clone()).await;
         if let Err(why) = deletion {
@@ -103,11 +104,39 @@ impl Handler {
         Ok(())
     }
 
+    async fn get_last_posted_opportunity_id(&self, context: Context, channel: &ChannelId) -> Result<u16, SerenityError> {
+        let mut most_recent_id: u16 = 0;
+
+        let mut messages_stream = channel.messages_iter(&context).boxed();
+        while let Some(message) = messages_stream.next().await {
+            let message = message?;
+            if message.is_own(&context).await {
+                // Our messages should contain a link to the opportunity.
+                // Such links are of the form:
+                //    https://.../.../.../discussions/integer
+                // We want to extract the integer.
+                if let Some(link) = github_scraper::DiscussionLink::pull_from(&message.content).iter().next() {
+                    let id = link.get_id();
+                    most_recent_id = max(id, most_recent_id);
+
+                    // Newer posts have greater ids. As we iterate from most recent to least recent
+                    // posts, we should now have the greatest ID.
+                    break;
+                }
+            }
+        }
+
+        Ok(most_recent_id)
+    }
+
     /// Forward new opportunities posted to GitHub to [channel].
     /// Returns errors generated in creating the message.
-    async fn forward_opportunities(&self, http: impl AsRef<Http>, channel: &ChannelId) -> Result<(), SerenityError> {
-        let msg = channel.send_message(http, |m| {
-            m.content("test");
+    async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
+        // Find the most recent post (by us) and extract its index.
+        let last_posted_id = self.get_last_posted_opportunity_id(context.clone(), &channel).await?;
+
+        let msg = channel.send_message(&context, |m| {
+            m.content(format!("Last posted ID was {}.", last_posted_id));
 
             m
         }).await;
@@ -121,7 +150,7 @@ impl Handler {
 
     async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), SerenityError> {
         self.delete_illegal_posts(context.clone(), &channel_id).await?;
-        self.forward_opportunities(context.http.clone(), &channel_id).await?;
+        self.forward_opportunities(context.clone(), &channel_id).await?;
 
         Ok(())
     }
