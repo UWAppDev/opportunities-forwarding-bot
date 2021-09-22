@@ -40,6 +40,36 @@ impl Handler {
         channel_name == &Some("opportunities".to_string())
     }
 
+    /// Get a list of all channels we should manage.
+    async fn get_target_channels(&self, ctx: Context) -> Result<Vec<ChannelId>, SerenityError> {
+        let mut result: Vec<ChannelId> = Vec::new();
+        let cache: Arc<Cache> = ctx.cache;
+        let http: Arc<Http> = ctx.http;
+
+        let user = http.get_current_user().await?;
+        let guilds = user.guilds(http.clone()).await?;
+
+        // Search each guild for target channels.
+        let guild_ids =
+            guilds.iter()
+                .map(|guild| guild.id);
+
+        for guild_id in guild_ids {
+            let channels = guild_id.channels(http.clone()).await?;
+
+            for (channel_id, _channel) in channels.iter() {
+                let channel_name = channel_id.name(cache.clone()).await;
+
+                if self.is_target_channel(&channel_name) {
+                    result.push(channel_id.clone());
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+
     /// Forward new opportunities posted to GitHub to [channel].
     /// Returns errors generated in creating the message.
     async fn forward_opportunities(&self, http: impl AsRef<Http>, channel: &ChannelId) -> Result<(), SerenityError> {
@@ -71,13 +101,13 @@ impl EventHandler for Handler {
                 println!("Error getting current user ID! {:?}", why);
                 return;
             },
-            Ok(id) => {
-                my_id = id;
+            Ok(user) => {
+                my_id = user.id;
             },
         };
 
         // Make sure we're not the one who posted the message.
-        if msg.author.id == my_id.id {
+        if msg.author.id == my_id {
             // We can post messages in the opportunities channel.
             return;
         }
@@ -97,45 +127,22 @@ impl EventHandler for Handler {
     /// Triggered when the bot successfully connects to the server.
     /// [ctx] and [ready] provide information about the Shard (instance of the bot in a guild)
     /// and user.
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, context: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-        let cache: Arc<Cache> = ctx.cache;
-        let http: Arc<Http> = ctx.http;
-
-        let guilds;
-        match ready.user.guilds(http.clone()).await {
+        let channels;
+        match self.get_target_channels(context.clone()).await {
+            Ok(c) => { channels = c; },
             Err(why) => {
-                println!("Unable to fetch guilds the user is in: {:?}", why);
+                println!("Unable to fetch a list of target channels: {:?}", why);
                 return;
             },
-            Ok(g) => { guilds = g; }
         };
 
-        // Find the channel(s) we want to post to.
-        let guild_ids =
-            guilds.iter()
-                .map(|guild| guild.id);
+        for channel_id in channels.iter() {
+            let res = self.forward_opportunities(context.http.clone(), &channel_id).await;
 
-        for guild_id in guild_ids {
-            let channels;
-            match guild_id.channels(http.clone()).await {
-                Ok(channel_list) => { channels = channel_list; },
-                Err(why) => {
-                    println!("Error getting channels: {:?}", why);
-                    continue;
-                }
-            };
-
-            for (channel_id, _channel) in channels.iter() {
-                let channel_name = channel_id.name(cache.clone()).await;
-
-                if self.is_target_channel(&channel_name) {
-                    let res = self.forward_opportunities(http.clone(), channel_id).await;
-
-                    if let Err(why) = res {
-                        println!("Unable to forward opportunities to channel: {:?}", why);
-                    }
-                }
+            if let Err(why) = res {
+                println!("Error forwarding opportunities to a channel: {:?}", why);
             }
         }
     }
