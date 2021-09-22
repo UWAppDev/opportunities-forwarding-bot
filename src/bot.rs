@@ -76,6 +76,9 @@ impl Handler {
     /// Delete all illegal posts from [channel]. A message is considered illegal if
     /// it was posted after the bot's last post in [channel].
     async fn delete_illegal_posts(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
+        let mut found_own = false;
+        let mut target_posts: Vec<Box<Arc<Message>>> = Vec::new();
+
         // See documentation for ChannelId::messages_iter.
         let mut messages_stream = channel.messages_iter(&context).boxed();
         while let Some(message) = messages_stream.next().await {
@@ -84,11 +87,19 @@ impl Handler {
             // Stop when we encounter something we've posted.
             // We only want to delete posts made while we've been away.
             if message.is_own(&context).await {
+                found_own = true;
                 break;
             }
 
-            self.block_illegal_post(context.clone(), &message).await?;
+            target_posts.push(Box::new(Arc::new(message)));
         }
+
+        if found_own {
+            for message in target_posts {
+                self.block_illegal_post(context.clone(), &message).await?;
+            }
+        }
+
         Ok(())
     }
 
