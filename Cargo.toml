@@ -11,4 +11,4 @@ tokio = { version = "1", features = ["full"] }
 [dependencies.serenity]
 version = "0.10"
 default-features = false
-features = ["client", "builder", "cache", "utils", "gateway", "rustls_backend", "model"]
+features = ["client", "builder", "cache", "utils", "collector", "gateway", "rustls_backend", "model"]

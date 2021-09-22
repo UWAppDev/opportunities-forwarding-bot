@@ -1,6 +1,7 @@
 use serenity::{
     async_trait,
-    model::{ channel::Message, gateway::Ready, id::ChannelId, client::Context },
+    client::Context,
+    model::{ channel::Message, gateway::Ready, id::ChannelId },
     prelude::*
 };
 
@@ -12,8 +13,10 @@ struct Handler;
 impl EventHandler for Handler {
     async fn message(&self, context: Context, msg: Message) {
         let cache = &context.cache;
+        let name = msg.channel_id.name(cache).await;
+        let target_channel = "opportunities".to_string();
 
-        if msg.channel_id.name(cache) == "opportunities" {
+        if name == Some(target_channel) {
             println!("Message posted in the opportunities channel! {}", msg.content);
 
             let dm = msg
@@ -23,7 +26,7 @@ impl EventHandler for Handler {
                     m
                 }).await;
 
-            let deletion = msg.delete(cache).await;
+            let deletion = msg.delete(context.http).await;
 
             if let Err(r) = dm {
                 println!("Error: {:?}", r);
