@@ -9,6 +9,7 @@ use serenity::{
 use serenity::futures::StreamExt;
 
 use crate::github_scraper;
+use crate::github_scraper::{ DiscussionPost, DiscussionLink };
 use std::sync::Arc;
 use std::cmp::max;
 
@@ -115,7 +116,7 @@ impl Handler {
                 // Such links are of the form:
                 //    https://.../.../.../discussions/integer
                 // We want to extract the integer.
-                if let Some(link) = github_scraper::DiscussionLink::pull_from(&message.content).iter().next() {
+                if let Some(link) = DiscussionLink::pull_from(&message.content).iter().next() {
                     let id = link.get_id();
                     most_recent_id = max(id, most_recent_id);
 
@@ -131,25 +132,38 @@ impl Handler {
 
     /// Forward new opportunities posted to GitHub to `channel`.
     /// Returns errors generated in creating the message.
-    async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
+    async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
         // Find the most recent post (by us) and extract its index.
         let last_posted_id = self.get_last_posted_opportunity_id(context.clone(), &channel).await?;
 
-        let msg = channel.send_message(&context, |m| {
-            m.content(format!("Last posted ID was {}.", last_posted_id));
+        // Forward all newer opportunities.
+        let discussion_links = DiscussionLink::fetch().await?;
+        let newer_opportunities = discussion_links
+                .iter()
+                .filter(|link| link.get_id() > last_posted_id)
+                .map(|link| DiscussionPost::fetch_from(link.clone()));
 
-            m
-        }).await;
+        for promise in newer_opportunities {
+            let post = promise.await?;
+            let url = post.get_link().get_url();
+            let author = post.get_author();
+            let content = post.get_content();
 
-        if let Err(why) = msg {
-            return Err(why);
+            channel.send_message(&context, |m| {
+                m.content(format!("## Forwarded message from {}:\n**Author:** {}\n\n{}", url, author, content));
+
+                m
+            }).await?;
         }
 
         Ok(())
     }
 
-    async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), SerenityError> {
-        self.delete_illegal_posts(context.clone(), &channel_id).await?;
+    async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
+        if let Err(why) = self.delete_illegal_posts(context.clone(), &channel_id).await {
+            return Err(Box::new(why));
+        }
+
         self.forward_opportunities(context.clone(), &channel_id).await?;
 
         Ok(())
@@ -159,7 +173,6 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     /// Handle a message posted (by a user) to the opportunities channel.
-    ///
     async fn message(&self, context: Context, msg: Message) {
         let cache = &context.cache;
         let name = msg.channel_id.name(cache).await;

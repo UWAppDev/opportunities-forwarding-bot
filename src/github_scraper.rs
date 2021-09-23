@@ -17,11 +17,13 @@ macro_rules! DISCUSSION_LINK_REGEX {
 /// Where _users_ should post new opportunities.
 pub const OPPORTUNITIES_POST_TO_URL: &'static str = OPPORTUNITIES_LIST_URL!();
 
+#[derive(Clone, Debug)]
 pub struct DiscussionLink {
     content: String,
     id: u16,
 }
 
+#[derive(Clone, Debug)]
 pub struct DiscussionPost {
     content: String,
     author: String,
@@ -38,6 +40,14 @@ impl DiscussionLink {
             id
         }
     }
+
+    /// Extract all links to discussion posts from this' remote repository.
+    pub async fn fetch() -> Result<Vec<DiscussionLink>, Box<dyn std::error::Error>> {
+        let html = reqwest::get(OPPORTUNITIES_LIST_URL!()).await?.text().await?;
+
+        Ok(Self::pull_from(&html))
+    }
+
 
     /// Pull and return all links to discussion posts from `text`.
     pub fn pull_from(text: &str) -> Vec<DiscussionLink> {
@@ -78,10 +88,10 @@ impl DiscussionLink {
     /// For example:
     /// ```
     /// let link = DiscussionLink::new("/UWAppDev/community/discussions/0", 0);
-    /// assert_eq!(link.get_content(), "https://github.com/UWAppDev/community/discussions/0");
+    /// assert_eq!(link.get_url(), "https://github.com/UWAppDev/community/discussions/0");
     /// ```
     ///
-    pub fn get_content(&self) -> String {
+    pub fn get_url(&self) -> String {
         if self.content.starts_with("http") {
             self.content.clone()
         } else if self.content.starts_with("github") || self.content.starts_with("www.") {
@@ -120,7 +130,7 @@ impl DiscussionPost {
     /// Fetches all applicable discussion posts from this project's GitHub.
     /// As this involves network communication, errors are possible.
     pub async fn fetch_from(link: DiscussionLink) -> Result<DiscussionPost, Box<dyn std::error::Error>> {
-        let html = reqwest::get(link.get_content()).await?.text().await?;
+        let html = reqwest::get(link.get_url()).await?.text().await?;
 
         Self::pull_from(link, &html)
     }
@@ -167,6 +177,11 @@ impl DiscussionPost {
     pub fn get_author(&self) -> &str {
         &self.author[..]
     }
+
+    /// Gets the [DiscussionLink] that points to this' content.
+    pub fn get_link(&self) -> &DiscussionLink {
+        &self.url
+    }
 }
 
 #[cfg(test)]
@@ -198,13 +213,13 @@ mod tests {
     #[test]
     fn test_complete_short_link() {
         let link = DiscussionLink::new("/foo/bar".to_string(), 0);
-        assert_eq!(link.get_content(), "https://github.com/foo/bar");
+        assert_eq!(link.get_url(), "https://github.com/foo/bar");
     }
 
     #[test]
     fn test_complete_full_link() {
         let link = DiscussionLink::new("https://github.com/a/test".to_string(), 1);
-        assert_eq!(link.get_content(), "https://github.com/a/test");
+        assert_eq!(link.get_url(), "https://github.com/a/test");
     }
 
     #[test]
