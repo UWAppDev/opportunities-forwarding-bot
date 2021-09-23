@@ -1,8 +1,9 @@
 # opportunities-forwarding-bot
 A Discord bot that forwards content from GitHub!
 
-# Want to test it?
+# Testing it
  * First, make sure you update it to fetch from your own GitHub repo! Currently, this must be changed by editing `src/github_scraper.rs`.
+   * Without changing this, the bot will take opportunities from [this repository's discussion tab](https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/categories/opportunities).
  * Next, you'll need to create a Discord application and add a bot to it.
    * [This tutorial explains how to do that.](https://discordjs.guide/preparations/setting-up-a-bot-application.html#creating-your-bot)
    * When generating your token, make sure you give the bot these permissions:
