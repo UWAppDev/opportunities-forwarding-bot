@@ -1,4 +1,6 @@
 # opportunities-forwarding-bot
+![](https://user-images.githubusercontent.com/46334387/134444132-25b4a52b-eb76-4cca-a7fa-832278d17ef4.png)
+
 A Discord bot that forwards content from GitHub!
 
 # Testing it
