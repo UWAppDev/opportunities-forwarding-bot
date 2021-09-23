@@ -1,4 +1,4 @@
-/// Searches for discussions on GitHub marked with "opportunity"
+//! Searches for discussions on GitHub marked with "opportunity"
 
 use regex::Regex;
 use lazy_static::lazy_static;
@@ -6,6 +6,8 @@ use std::collections::BTreeSet;
 
 use select::document::Document;
 use select::predicate::{Class, Attr};
+
+use crate::html_walker::html_to_md;
 
 // When production-ready, replace with "/UWAppDev/community/discussions"
 macro_rules! DISCUSSIONS_BASE_URL { () => { "UWAppDev/opportunities-forwarding-bot/discussions/" }; }
@@ -34,7 +36,8 @@ pub struct DiscussionPost {
 struct PostNotFoundError;
 
 impl DiscussionLink {
-    fn new(full_link_text: String, id: u16) -> DiscussionLink {
+    /// Create a link. Assumes `full_link_text` points to a valid discussion.
+    pub fn new(full_link_text: String, id: u16) -> DiscussionLink {
         DiscussionLink {
             content: full_link_text,
             id
@@ -87,7 +90,8 @@ impl DiscussionLink {
     ///
     /// For example:
     /// ```
-    /// let link = DiscussionLink::new("/UWAppDev/community/discussions/0", 0);
+    /// # use forwarding_bot::github_scraper::DiscussionLink;
+    /// let link = DiscussionLink::new("/UWAppDev/community/discussions/0".to_string(), 0);
     /// assert_eq!(link.get_url(), "https://github.com/UWAppDev/community/discussions/0");
     /// ```
     ///
@@ -158,7 +162,10 @@ impl DiscussionPost {
         };
 
         let content = match content {
-            Some(node) => node.text(), // TODO: Walk the HTML tree here to convert it to markdown.
+            Some(node) => {
+                let post_html = node.html();
+                html_to_md(&post_html[..])
+            }
             None => "Unable to find content for this post!!!".to_string(),
         };
 
@@ -227,7 +234,7 @@ mod tests {
         let link = DiscussionLink::new("https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/5".to_string(), 5);
         let post = DiscussionPost::pull_from(link, include_str!("../res/tests/ghub_opportunities_post_snapshot.html")).unwrap();
         assert_eq!(post.get_author(), "personalizedrefrigerator");
-        assert_eq!(post.get_content(), "This is an opportunity to test the opportunities-forwarding-bot!");
+        assert_eq!(post.get_content(), "This is an opportunity to test the `opportunities-forwarding-bot`!");
     }
 
     // tokio::test because we're doing a test of an async function

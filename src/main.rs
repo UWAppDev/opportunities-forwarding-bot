@@ -9,8 +9,7 @@ use std::env;
 
 static ENV_VAR_TOKEN_NAME: &str = "DISCORD_BOT_TOKEN";
 
-mod bot;
-mod github_scraper;
+use forwarding_bot::bot;
 
 fn get_bot_token() -> Option<String> {
     let args: Vec<String> = env::args().collect();
