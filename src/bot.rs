@@ -17,7 +17,7 @@ macro_rules! DELETED_MESSAGE_WARNING { () => { "I've deleted your message from t
 struct Handler;
 
 impl Handler {
-    /// Delete an illegal message, [msg] and direct messages the author an appropriate
+    /// Delete an illegal message, `msg` and direct messages the author an appropriate
     /// explanation.
     /// If unable to delete the message (an error!) no direct message is sent to the author.
     async fn block_illegal_post(&self, context: Context, msg: &Message) -> Result<(), SerenityError> {
@@ -74,8 +74,8 @@ impl Handler {
         Ok(result)
     }
 
-    /// Delete all illegal posts from [channel]. A message is considered illegal if
-    /// it was posted after the bot's last post in [channel].
+    /// Delete all illegal posts from `channel`. A message is considered illegal if
+    /// it was posted after the bot's last post in `channel`.
     async fn delete_illegal_posts(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
         let mut found_own = false;
         let mut target_posts: Vec<Box<Arc<Message>>> = Vec::new();
@@ -129,7 +129,7 @@ impl Handler {
         Ok(most_recent_id)
     }
 
-    /// Forward new opportunities posted to GitHub to [channel].
+    /// Forward new opportunities posted to GitHub to `channel`.
     /// Returns errors generated in creating the message.
     async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
         // Find the most recent post (by us) and extract its index.
@@ -189,7 +189,7 @@ impl EventHandler for Handler {
     }
 
     /// Triggered when the bot successfully connects to the server.
-    /// [ctx] and [ready] provide information about the Shard (instance of the bot in a guild)
+    /// `ctx` and `ready` provide information about the Shard (instance of the bot in a guild)
     /// and user.
     async fn ready(&self, context: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
@@ -213,7 +213,7 @@ impl EventHandler for Handler {
 }
 
 /// Starts the forwarding bot.
-/// [token] should be gotten from Discord and will allow
+/// `token` should be gotten from Discord and will allow
 /// us to communicate with the Discord API.
 pub async fn start(token: String) {
     // Connect to Discord!
