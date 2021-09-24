@@ -18,7 +18,7 @@ fn get_bot_token() -> Option<String> {
         // We wern't given an argument.
         // Check the environment.
         return match env::var(ENV_VAR_TOKEN_NAME) {
-            Ok(s) => Some(s.clone()),
+            Ok(s) => Some(s),
             Err(_reason) => None
         };
     }

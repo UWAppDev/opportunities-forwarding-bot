@@ -67,7 +67,7 @@ impl Handler {
                 let channel_name = channel_id.name(cache.clone()).await;
 
                 if self.is_target_channel(&channel_name) {
-                    result.push(channel_id.clone());
+                    result.push(*channel_id);
                 }
             }
         }
@@ -116,7 +116,7 @@ impl Handler {
                 // Such links are of the form:
                 //    https://.../.../.../discussions/integer
                 // We want to extract the integer.
-                if let Some(link) = DiscussionLink::pull_from(&message.content).iter().next() {
+                if let Some(link) = DiscussionLink::pull_from(&message.content).get(0) {
                     let id = link.get_id();
                     most_recent_id = max(id, most_recent_id);
 
@@ -134,7 +134,7 @@ impl Handler {
     /// Returns errors generated in creating the message.
     async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
         // Find the most recent post (by us) and extract its index.
-        let last_posted_id = self.get_last_posted_opportunity_id(context.clone(), &channel).await?;
+        let last_posted_id = self.get_last_posted_opportunity_id(context.clone(), channel).await?;
 
         // Forward all newer opportunities.
         let discussion_links = DiscussionLink::fetch().await?;
@@ -160,11 +160,11 @@ impl Handler {
     }
 
     async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
-        if let Err(why) = self.delete_illegal_posts(context.clone(), &channel_id).await {
+        if let Err(why) = self.delete_illegal_posts(context.clone(), channel_id).await {
             return Err(Box::new(why));
         }
 
-        self.forward_opportunities(context.clone(), &channel_id).await?;
+        self.forward_opportunities(context.clone(), channel_id).await?;
 
         Ok(())
     }
@@ -216,7 +216,7 @@ impl EventHandler for Handler {
         };
 
         for channel_id in channels.iter() {
-            let res = self.handle_channel(context.clone(), &channel_id).await;
+            let res = self.handle_channel(context.clone(), channel_id).await;
 
             if let Err(why) = res {
                 println!("Error forwarding opportunities to a channel: {:?}", why);

@@ -11,7 +11,7 @@ pub struct MarkdownWalker {
 impl MarkdownWalker {
     /// Get an empty [MarkdownWalker].
     /// This walker can then walk the DOM via [walk].
-    pub fn new() -> MarkdownWalker {
+    pub fn new() -> Self {
         MarkdownWalker {
             buffer: Vec::new()
         }
@@ -37,7 +37,6 @@ impl MarkdownWalker {
         }
         else if node.is(Comment) {
             // Skip comments.
-            return;
         }
         else if node.is(Name("p")) || node.is(Name("div")) || node.is(Name("tr")) {
             self.visit_children(node);
@@ -126,11 +125,17 @@ impl MarkdownWalker {
     }
 }
 
+impl Default for MarkdownWalker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Walks the given `html` using a [MarkdownWalker]
 /// and returns the collected content.
 pub fn html_to_md(html: &str) -> String {
     let mut walker = MarkdownWalker::new();
-    walker.start(&html[..]);
+    walker.start(html);
     walker.get_content()
 }
 

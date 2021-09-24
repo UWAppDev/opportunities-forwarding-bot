@@ -17,7 +17,7 @@ macro_rules! DISCUSSION_LINK_REGEX {
 }
 
 /// Where _users_ should post new opportunities.
-pub const OPPORTUNITIES_POST_TO_URL: &'static str = OPPORTUNITIES_LIST_URL!();
+pub const OPPORTUNITIES_POST_TO_URL: &str = OPPORTUNITIES_LIST_URL!();
 
 #[derive(Clone, Debug)]
 pub struct DiscussionLink {
@@ -100,7 +100,7 @@ impl DiscussionLink {
             self.content.clone()
         } else if self.content.starts_with("github") || self.content.starts_with("www.") {
             format!("https://{}", self.content)
-        } else if self.content.starts_with("/") {
+        } else if self.content.starts_with('/') {
             format!("https://github.com{}", self.content)
         } else {
             format!("https://github.com/{}", self.content)
