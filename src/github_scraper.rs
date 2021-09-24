@@ -1,19 +1,33 @@
 //! Searches for discussions on GitHub marked with "opportunity"
 
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 use std::collections::BTreeSet;
 
 use select::document::Document;
-use select::predicate::{Class, Attr};
+use select::predicate::{Attr, Class};
 
 use crate::html_walker::html_to_md;
 
 // When production-ready, replace with "/UWAppDev/community/discussions"
-macro_rules! DISCUSSIONS_BASE_URL { () => { "UWAppDev/opportunities-forwarding-bot/discussions/" }; }
-macro_rules! OPPORTUNITIES_LIST_URL { () => { concat!("https://github.com/", DISCUSSIONS_BASE_URL!(), "categories/opportunities/") }; }
+macro_rules! DISCUSSIONS_BASE_URL {
+    () => {
+        "UWAppDev/opportunities-forwarding-bot/discussions/"
+    };
+}
+macro_rules! OPPORTUNITIES_LIST_URL {
+    () => {
+        concat!(
+            "https://github.com/",
+            DISCUSSIONS_BASE_URL!(),
+            "categories/opportunities/"
+        )
+    };
+}
 macro_rules! DISCUSSION_LINK_REGEX {
-    () => { concat!(r"/", DISCUSSIONS_BASE_URL!(), r"[/]*(?P<id>\d+)"); };
+    () => {
+        concat!(r"/", DISCUSSIONS_BASE_URL!(), r"[/]*(?P<id>\d+)");
+    };
 }
 
 /// Where _users_ should post new opportunities.
@@ -40,17 +54,19 @@ impl DiscussionLink {
     pub fn new(full_link_text: String, id: u16) -> DiscussionLink {
         DiscussionLink {
             content: full_link_text,
-            id
+            id,
         }
     }
 
     /// Extract all links to discussion posts from this' remote repository.
     pub async fn fetch() -> Result<Vec<DiscussionLink>, Box<dyn std::error::Error>> {
-        let html = reqwest::get(OPPORTUNITIES_LIST_URL!()).await?.text().await?;
+        let html = reqwest::get(OPPORTUNITIES_LIST_URL!())
+            .await?
+            .text()
+            .await?;
 
         Ok(Self::pull_from(&html))
     }
-
 
     /// Pull and return all links to discussion posts from `text`.
     pub fn pull_from(text: &str) -> Vec<DiscussionLink> {
@@ -59,23 +75,23 @@ impl DiscussionLink {
         }
         let mut seen_ids: BTreeSet<u16> = BTreeSet::new();
 
-        let mut res: Vec<DiscussionLink> =
-            RE.captures_iter(text)
-                .map(|captures| {
-                    let full_link: String = captures[0].into();
-                    let id: u16 = captures["id"].parse().unwrap();
+        let mut res: Vec<DiscussionLink> = RE
+            .captures_iter(text)
+            .map(|captures| {
+                let full_link: String = captures[0].into();
+                let id: u16 = captures["id"].parse().unwrap();
 
-                    DiscussionLink::new(full_link, id)
-                })
-                .filter(|link| {
-                    if seen_ids.contains(&link.get_id()) {
-                        return false;
-                    }
+                DiscussionLink::new(full_link, id)
+            })
+            .filter(|link| {
+                if seen_ids.contains(&link.get_id()) {
+                    return false;
+                }
 
-                    seen_ids.insert(link.get_id());
-                    true
-                })
-                .collect();
+                seen_ids.insert(link.get_id());
+                true
+            })
+            .collect();
         res.sort_by(|a, b| a.id.cmp(&b.id));
 
         res
@@ -110,7 +126,10 @@ impl DiscussionLink {
 
 impl std::fmt::Display for PostNotFoundError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "No discussion post found in the document associated with the link")
+        write!(
+            f,
+            "No discussion post found in the document associated with the link"
+        )
     }
 }
 
@@ -127,34 +146,45 @@ impl DiscussionPost {
         DiscussionPost {
             content,
             author,
-            url: link
+            url: link,
         }
     }
 
     /// Fetches all applicable discussion posts from this project's GitHub.
     /// As this involves network communication, errors are possible.
-    pub async fn fetch_from(link: DiscussionLink) -> Result<DiscussionPost, Box<dyn std::error::Error>> {
+    pub async fn fetch_from(
+        link: DiscussionLink,
+    ) -> Result<DiscussionPost, Box<dyn std::error::Error>> {
         let html = reqwest::get(link.get_url()).await?.text().await?;
 
         Self::pull_from(link, &html)
     }
 
     /// Create a DiscussionPost from given `html` that has been fetched from `link`.
-    fn pull_from(link: DiscussionLink, html: &str) -> Result<DiscussionPost, Box<dyn std::error::Error>> {
+    fn pull_from(
+        link: DiscussionLink,
+        html: &str,
+    ) -> Result<DiscussionPost, Box<dyn std::error::Error>> {
         let document = Document::from(html);
-        let first_comment = document
-                .find(Class("unminimized-comment"))
-                .next();
+        let first_comment = document.find(Class("unminimized-comment")).next();
 
         if None == first_comment {
             return Err(Box::new(PostNotFoundError));
         }
         let first_comment = first_comment.unwrap();
 
-        let author = first_comment.find(select::predicate::And(Class("author"), select::predicate::Name("a")))
-                .next();
-        let content = first_comment.find(select::predicate::And(Attr("data-paste-markdown-skip", ""), Class("js-translation-source")))
-                .next();
+        let author = first_comment
+            .find(select::predicate::And(
+                Class("author"),
+                select::predicate::Name("a"),
+            ))
+            .next();
+        let content = first_comment
+            .find(select::predicate::And(
+                Attr("data-paste-markdown-skip", ""),
+                Class("js-translation-source"),
+            ))
+            .next();
 
         let author = match author {
             Some(node) => node.text(),
@@ -193,11 +223,15 @@ impl DiscussionPost {
 
 #[cfg(test)]
 mod tests {
-    use super::{ DiscussionLink, DiscussionPost };
+    use super::{DiscussionLink, DiscussionPost};
 
     #[test]
     fn test_link_scrape_simple() {
-        let source = format!("/{}123, /{}/0", DISCUSSIONS_BASE_URL!(), DISCUSSIONS_BASE_URL!());
+        let source = format!(
+            "/{}123, /{}/0",
+            DISCUSSIONS_BASE_URL!(),
+            DISCUSSIONS_BASE_URL!()
+        );
         let links = DiscussionLink::pull_from(&source);
 
         assert_eq!(links.len(), 2, "Ensure we find two links in {}", source);
@@ -231,19 +265,38 @@ mod tests {
 
     #[test]
     fn test_discussion_post_from_html() {
-        let link = DiscussionLink::new("https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/5".to_string(), 5);
-        let post = DiscussionPost::pull_from(link, include_str!("../res/tests/ghub_opportunities_post_snapshot.html")).unwrap();
+        let link = DiscussionLink::new(
+            "https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/5".to_string(),
+            5,
+        );
+        let post = DiscussionPost::pull_from(
+            link,
+            include_str!("../res/tests/ghub_opportunities_post_snapshot.html"),
+        )
+        .unwrap();
         assert_eq!(post.get_author(), "personalizedrefrigerator");
-        assert_eq!(post.get_content(), "This is an opportunity to test the `opportunities-forwarding-bot`!");
+        assert_eq!(
+            post.get_content(),
+            "This is an opportunity to test the `opportunities-forwarding-bot`!"
+        );
     }
 
     // tokio::test because we're doing a test of an async function
     #[tokio::test]
     async fn test_discussion_post_fetch_from_internet() {
-        let link = DiscussionLink::new("https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/3".to_string(), 3);
-        let post = DiscussionPost::fetch_from(link).await.expect("Unable to fetch remote discussion post!");
+        let link = DiscussionLink::new(
+            "https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/3".to_string(),
+            3,
+        );
+        let post = DiscussionPost::fetch_from(link)
+            .await
+            .expect("Unable to fetch remote discussion post!");
         assert_eq!(post.get_author(), "personalizedrefrigerator");
-        assert!(post.get_content().contains("This post will be used to test the bot!"), "{} does not contian the test string!", post.get_content());
+        assert!(
+            post.get_content()
+                .contains("This post will be used to test the bot!"),
+            "{} does not contian the test string!",
+            post.get_content()
+        );
     }
 }
-

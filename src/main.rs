@@ -19,7 +19,7 @@ fn get_bot_token() -> Option<String> {
         // Check the environment.
         return match env::var(ENV_VAR_TOKEN_NAME) {
             Ok(s) => Some(s),
-            Err(_reason) => None
+            Err(_reason) => None,
         };
     }
 
@@ -45,7 +45,9 @@ async fn main() {
 
 fn print_usage(app_name: &str) {
     println!("Usage: {} <bot token>", app_name);
-    println!(" If <bot token> is not provided, the contents of
-the environment variable, {} are used.", ENV_VAR_TOKEN_NAME);
+    println!(
+        " If <bot token> is not provided, the contents of
+the environment variable, {} are used.",
+        ENV_VAR_TOKEN_NAME
+    );
 }
-

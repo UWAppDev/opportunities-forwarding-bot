@@ -1,17 +1,17 @@
+use serenity::futures::StreamExt;
 use serenity::{
     async_trait,
-    client::{ Context },
     cache::Cache,
+    client::Context,
     http::client::Http,
-    model::{ channel::Message, gateway::Ready, id::ChannelId, channel::ReactionType },
-    prelude::*
+    model::{channel::Message, channel::ReactionType, gateway::Ready, id::ChannelId},
+    prelude::*,
 };
-use serenity::futures::StreamExt;
 
 use crate::github_scraper;
-use crate::github_scraper::{ DiscussionPost, DiscussionLink };
-use std::sync::Arc;
+use crate::github_scraper::{DiscussionLink, DiscussionPost};
 use std::cmp::max;
+use std::sync::Arc;
 
 macro_rules! DELETED_MESSAGE_WARNING { () => { "I've deleted your message from the opportunities channel. It said: \n\n{}\n\nPlease post opportunities here: {}" }; }
 
@@ -21,19 +21,29 @@ impl Handler {
     /// Delete an illegal message, `msg` and direct messages the author an appropriate
     /// explanation.
     /// If unable to delete the message (an error!) no direct message is sent to the author.
-    async fn block_illegal_post(&self, context: Context, msg: &Message) -> Result<(), SerenityError> {
-        let reply_text = format!(DELETED_MESSAGE_WARNING!(), msg.content, github_scraper::OPPORTUNITIES_POST_TO_URL);
+    async fn block_illegal_post(
+        &self,
+        context: Context,
+        msg: &Message,
+    ) -> Result<(), SerenityError> {
+        let reply_text = format!(
+            DELETED_MESSAGE_WARNING!(),
+            msg.content,
+            github_scraper::OPPORTUNITIES_POST_TO_URL
+        );
 
         let deletion = msg.delete(context.http.clone()).await;
         if let Err(why) = deletion {
             return Err(why);
         }
 
-        let reply = msg.author
+        let reply = msg
+            .author
             .dm(&context, |m| {
                 m.content(reply_text);
                 m
-            }).await;
+            })
+            .await;
         if let Err(why) = reply {
             return Err(why);
         }
@@ -56,9 +66,7 @@ impl Handler {
         let guilds = user.guilds(http.clone()).await?;
 
         // Search each guild for target channels.
-        let guild_ids =
-            guilds.iter()
-                .map(|guild| guild.id);
+        let guild_ids = guilds.iter().map(|guild| guild.id);
 
         for guild_id in guild_ids {
             let channels = guild_id.channels(http.clone()).await?;
@@ -77,7 +85,11 @@ impl Handler {
 
     /// Delete all illegal posts from `channel`. A message is considered illegal if
     /// it was posted after the bot's last post in `channel`.
-    async fn delete_illegal_posts(&self, context: Context, channel: &ChannelId) -> Result<(), SerenityError> {
+    async fn delete_illegal_posts(
+        &self,
+        context: Context,
+        channel: &ChannelId,
+    ) -> Result<(), SerenityError> {
         let mut found_own = false;
         let mut target_posts: Vec<Box<Arc<Message>>> = Vec::new();
 
@@ -105,7 +117,11 @@ impl Handler {
         Ok(())
     }
 
-    async fn get_last_posted_opportunity_id(&self, context: Context, channel: &ChannelId) -> Result<u16, SerenityError> {
+    async fn get_last_posted_opportunity_id(
+        &self,
+        context: Context,
+        channel: &ChannelId,
+    ) -> Result<u16, SerenityError> {
         let mut most_recent_id: u16 = 0;
 
         let mut messages_stream = channel.messages_iter(&context).boxed();
@@ -132,16 +148,22 @@ impl Handler {
 
     /// Forward new opportunities posted to GitHub to `channel`.
     /// Returns errors generated in creating the message.
-    async fn forward_opportunities(&self, context: Context, channel: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn forward_opportunities(
+        &self,
+        context: Context,
+        channel: &ChannelId,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Find the most recent post (by us) and extract its index.
-        let last_posted_id = self.get_last_posted_opportunity_id(context.clone(), channel).await?;
+        let last_posted_id = self
+            .get_last_posted_opportunity_id(context.clone(), channel)
+            .await?;
 
         // Forward all newer opportunities.
         let discussion_links = DiscussionLink::fetch().await?;
         let newer_opportunities = discussion_links
-                .iter()
-                .filter(|link| link.get_id() > last_posted_id)
-                .map(|link| DiscussionPost::fetch_from(link.clone()));
+            .iter()
+            .filter(|link| link.get_id() > last_posted_id)
+            .map(|link| DiscussionPost::fetch_from(link.clone()));
 
         for promise in newer_opportunities {
             let post = promise.await?;
@@ -149,22 +171,32 @@ impl Handler {
             let author = post.get_author();
             let content = post.get_content();
 
-            channel.send_message(&context, |m| {
-                m.content(format!("## Forwarded message from {}:\n**Author:** {}\n\n{}", url, author, content));
+            channel
+                .send_message(&context, |m| {
+                    m.content(format!(
+                        "## Forwarded message from {}:\n**Author:** {}\n\n{}",
+                        url, author, content
+                    ));
 
-                m
-            }).await?;
+                    m
+                })
+                .await?;
         }
 
         Ok(())
     }
 
-    async fn handle_channel(&self, context: Context, channel_id: &ChannelId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_channel(
+        &self,
+        context: Context,
+        channel_id: &ChannelId,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Err(why) = self.delete_illegal_posts(context.clone(), channel_id).await {
             return Err(Box::new(why));
         }
 
-        self.forward_opportunities(context.clone(), channel_id).await?;
+        self.forward_opportunities(context.clone(), channel_id)
+            .await?;
 
         Ok(())
     }
@@ -190,8 +222,7 @@ impl EventHandler for Handler {
             if let Err(why) = self.block_illegal_post(context, &msg).await {
                 println!("Error blocking post! {:?}", why);
             }
-        }
-        else if msg.is_private() {
+        } else if msg.is_private() {
             // For fun :)
             let reaction = ReactionType::Unicode("❓".to_string());
             let reaction = msg.react(context.http.clone(), reaction).await;
@@ -208,11 +239,13 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
         let channels;
         match self.get_target_channels(context.clone()).await {
-            Ok(c) => { channels = c; },
+            Ok(c) => {
+                channels = c;
+            }
             Err(why) => {
                 println!("Unable to fetch a list of target channels: {:?}", why);
                 return;
-            },
+            }
         };
 
         for channel_id in channels.iter() {
@@ -237,4 +270,3 @@ pub async fn start(token: String) {
 
     client.start().await.expect("Bot stopped!");
 }
-

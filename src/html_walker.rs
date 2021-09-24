@@ -1,7 +1,7 @@
 //! Utility functions for walking through a parsed HTML tree.
 
-use select::node::Node;
 use select::document::Document;
+use select::node::Node;
 use select::predicate::*;
 
 pub struct MarkdownWalker {
@@ -12,9 +12,7 @@ impl MarkdownWalker {
     /// Get an empty [MarkdownWalker].
     /// This walker can then walk the DOM via [walk].
     pub fn new() -> Self {
-        MarkdownWalker {
-            buffer: Vec::new()
-        }
+        MarkdownWalker { buffer: Vec::new() }
     }
 
     /// Walk to visit all of `node`'s children.
@@ -25,7 +23,10 @@ impl MarkdownWalker {
     }
 
     /// Adds the given str to the output.
-    fn add<T>(&mut self, text: T) where String: From<T> {
+    fn add<T>(&mut self, text: T)
+    where
+        String: From<T>,
+    {
         self.buffer.push(String::from(text));
     }
 
@@ -34,21 +35,17 @@ impl MarkdownWalker {
         if node.is(Text) {
             // We're a text node. Just output our text.
             self.add(node.text());
-        }
-        else if node.is(Comment) {
+        } else if node.is(Comment) {
             // Skip comments.
-        }
-        else if node.is(Name("p")) || node.is(Name("div")) || node.is(Name("tr")) {
+        } else if node.is(Name("p")) || node.is(Name("div")) || node.is(Name("tr")) {
             self.visit_children(node);
 
             // Paragraphs have a trailing newline
             self.add("\n");
-        }
-        else if node.is(Name("br")) {
+        } else if node.is(Name("br")) {
             // <br/>s don't have content.
             self.add("\n");
-        }
-        else if node.is(Name("a")) {
+        } else if node.is(Name("a")) {
             // A link
             let target = node.attr("href");
 
@@ -61,48 +58,39 @@ impl MarkdownWalker {
                 self.add(target);
                 self.add(") ");
             }
-        }
-        else if node.is(Name("i")) || node.is(Name("emph")) {
+        } else if node.is(Name("i")) || node.is(Name("emph")) {
             self.add("_");
             self.visit_children(node);
             self.add("_");
-        }
-        else if node.is(Name("b")) || node.is(Name("strong")) {
+        } else if node.is(Name("b")) || node.is(Name("strong")) {
             self.add("**");
             self.visit_children(node);
             self.add("**");
-        }
-        else if node.is(Name("code")) {
+        } else if node.is(Name("code")) {
             self.add("`");
             self.visit_children(node);
             self.add("`");
-        }
-        else if node.is(Name("pre")) {
+        } else if node.is(Name("pre")) {
             self.add("\n```\n");
             self.visit_children(node);
             self.add("\n```\n");
-        }
-        else if node.is(Name("h1")) {
+        } else if node.is(Name("h1")) {
             self.add("\n# ");
             self.visit_children(node);
             self.add("\n");
-        }
-        else if node.is(Name("h2")) {
+        } else if node.is(Name("h2")) {
             self.add("\n## ");
             self.visit_children(node);
             self.add("\n");
-        }
-        else if node.is(Name("h3")) {
+        } else if node.is(Name("h3")) {
             self.add("\n### ");
             self.visit_children(node);
             self.add("\n");
-        }
-        else if node.is(Name("quote")) {
+        } else if node.is(Name("quote")) {
             self.add("\n> ");
             self.visit_children(node);
             self.add("\n");
-        }
-        else {
+        } else {
             self.visit_children(node);
         }
     }
@@ -160,4 +148,3 @@ Of _a_ thing."#;
         assert_eq!(walker.get_content(), md);
     }
 }
-
