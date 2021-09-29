@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use select::document::Document;
 use select::predicate::{Attr, Class};
 
-use crate::html_walker::html_to_md;
+use crate::html_walker::html_to_md_minimal;
 
 // When production-ready, replace with "/UWAppDev/community/discussions"
 macro_rules! DISCUSSIONS_BASE_URL {
@@ -194,7 +194,7 @@ impl DiscussionPost {
         let content = match content {
             Some(node) => {
                 let post_html = node.html();
-                html_to_md(&post_html[..])
+                html_to_md_minimal(&post_html[..])
             }
             None => "Unable to find content for this post!!!".to_string(),
         };

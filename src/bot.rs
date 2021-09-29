@@ -174,7 +174,7 @@ impl Handler {
             channel
                 .send_message(&context, |m| {
                     m.content(format!(
-                        "## Forwarded message from {}:\n**Author:** {}\n\n{}",
+                        "**Forwarded message from** {}:\n**Author:** {}\n\n{}",
                         url, author, content
                     ));
 

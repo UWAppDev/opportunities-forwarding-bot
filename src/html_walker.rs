@@ -4,15 +4,38 @@ use select::document::Document;
 use select::node::Node;
 use select::predicate::*;
 
+/// Options for what to output.
+pub struct MarkdownOptions {
+    /// True iff the output markdown should use bold (**)
+    /// text to represent HTML headers.
+    pub use_bold_for_headers: bool,
+}
+
 pub struct MarkdownWalker {
     buffer: Vec<String>,
+    options: MarkdownOptions,
+}
+
+impl Default for MarkdownOptions {
+    fn default() -> Self {
+        MarkdownOptions {
+            use_bold_for_headers: false,
+        }
+    }
 }
 
 impl MarkdownWalker {
     /// Get an empty [MarkdownWalker].
     /// This walker can then walk the DOM via [walk].
     pub fn new() -> Self {
-        MarkdownWalker { buffer: Vec::new() }
+        MarkdownWalker {
+            buffer: Vec::new(),
+            options: Default::default(),
+        }
+    }
+
+    pub fn configure(&mut self, opts: MarkdownOptions) {
+        self.options = opts;
     }
 
     /// Walk to visit all of `node`'s children.
@@ -28,6 +51,26 @@ impl MarkdownWalker {
         String: From<T>,
     {
         self.buffer.push(String::from(text));
+    }
+
+    fn visit_header(&mut self, node: &Node, level: u8) {
+        self.add("\n");
+
+        if !self.options.use_bold_for_headers {
+            for _ in 1..=level {
+                self.add("#");
+            }
+            self.add(" ");
+        } else {
+            self.add("**");
+        }
+
+        self.visit_children(node);
+
+        if self.options.use_bold_for_headers {
+            self.add("**");
+        }
+        self.add("\n");
     }
 
     /// Walk the DOM.
@@ -75,17 +118,11 @@ impl MarkdownWalker {
             self.visit_children(node);
             self.add("\n```\n");
         } else if node.is(Name("h1")) {
-            self.add("\n# ");
-            self.visit_children(node);
-            self.add("\n");
+            self.visit_header(node, 1);
         } else if node.is(Name("h2")) {
-            self.add("\n## ");
-            self.visit_children(node);
-            self.add("\n");
+            self.visit_header(node, 2);
         } else if node.is(Name("h3")) {
-            self.add("\n### ");
-            self.visit_children(node);
-            self.add("\n");
+            self.visit_header(node, 3);
         } else if node.is(Name("quote")) {
             self.add("\n> ");
             self.visit_children(node);
@@ -123,6 +160,19 @@ impl Default for MarkdownWalker {
 /// and returns the collected content.
 pub fn html_to_md(html: &str) -> String {
     let mut walker = MarkdownWalker::new();
+    walker.start(html);
+    walker.get_content()
+}
+
+/// Convert the given html to markdown. Like [html_to_md],
+/// but works for more minimal markdown parsers. For example,
+/// headers are interpreted as bolded text, rather than full headers.
+pub fn html_to_md_minimal(html: &str) -> String {
+    let mut walker = MarkdownWalker::new();
+
+    walker.configure(MarkdownOptions {
+        use_bold_for_headers: true,
+    });
     walker.start(html);
     walker.get_content()
 }
