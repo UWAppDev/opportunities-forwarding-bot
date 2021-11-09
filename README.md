@@ -15,3 +15,6 @@ A Discord bot that forwards content from GitHub!
  * Make sure you've invited the bot to a server with a public channel named `opportunities`!
  * After building the repository (via `cargo build`), start the bot using `cargo run "<Your token goes here>"`.
    * The bot should forward opportunities from the GitHub repository's opportunities discussion category to your Discord server!
+
+# Questions
+ * [Start a discussion!](https://github.com/UWAppDev/opportunities-forwarding-bot/discussions/new)
